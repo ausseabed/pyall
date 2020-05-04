@@ -1162,8 +1162,8 @@ class h_HEIGHT:
         self.fileptr = fileptr
         self.fileptr.seek(numberOfBytes, 1)
         self.data = ""
-        self.Height = 0
-        self.HeightType = 0
+        self.Height = None
+        self.HeightType = None
 
     def read(self):
         self.fileptr.seek(self.offset, 0)
@@ -1184,6 +1184,15 @@ class h_HEIGHT:
 
         # now read the footer
         self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
+
+    def __repr__(self):
+        return (
+            "STX {} \n"
+            "typeOfDatagram {} \n"
+            "Height {} \n"
+            "HeightType {} \n"
+            .format(self.STX, self.typeOfDatagram, self.Height, self.HeightType)
+        )
 
 
 class h_HEIGHT_ENCODER:

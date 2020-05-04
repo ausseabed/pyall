@@ -132,7 +132,12 @@ def main():
 class ALLReader:
     """class to read a Kongsberg EM multibeam .all file"""
 
-    ALLPacketHeader_fmt = "=LBBHLL"
+    # `<` means little endian, following note comes from Kongsberg
+    #
+    # Please be aware that the following echo sounders: EM 3002, EM 710,
+    # EM 302, EM 122, EM 2040, EM 2040C and ME70BO use little endian byte
+    # order.
+    ALLPacketHeader_fmt = "<LBBHLLHH"
     ALLPacketHeader_len = struct.calcsize(ALLPacketHeader_fmt)
     ALLPacketHeader_unpack = struct.Struct(ALLPacketHeader_fmt).unpack_from
 
@@ -144,6 +149,8 @@ class ALLReader:
         self.fileSize = os.path.getsize(ALLfileName)
         self.recordDate = ""
         self.recordTime = ""
+        self.clockCounter = None
+        self.serialNumber = None
         self.recordCounter = 0
 
     def __str__(self):
@@ -197,8 +204,13 @@ class ALLReader:
             EMModel = s[3]
             RecordDate = s[4]
             RecordTime = float(s[5] / 1000.0)
+            ClockCounter = s[6]
+            SerialNumber = s[7]
+
             self.recordDate = RecordDate
             self.recordTime = RecordTime
+            self.clockCounter = ClockCounter
+            self.serialNumber = SerialNumber
 
             # now reset file pointer
             self.fileptr.seek(curr, 0)
@@ -216,6 +228,8 @@ class ALLReader:
                     EMModel,
                     RecordDate,
                     RecordTime,
+                    ClockCounter,
+                    SerialNumber,
                 )
 
             return (
@@ -225,9 +239,11 @@ class ALLReader:
                 EMModel,
                 RecordDate,
                 RecordTime,
+                ClockCounter,
+                SerialNumber,
             )
         except struct.error:
-            return 0, 0, 0, 0, 0, 0
+            return 0, 0, 0, 0, 0, 0, 0, 0
 
     def readDatagramBytes(self, offset, byteCount):
         """read the entire raw bytes for the datagram without changing the
@@ -255,6 +271,8 @@ class ALLReader:
             EMModel,
             RecordDate,
             RecordTime,
+            ClockCounter,
+            SerialNumber,
         ) = self.readDatagramHeader()
         start = to_timestamp(to_DateTime(RecordDate, RecordTime))
         self.rewind()
@@ -266,6 +284,8 @@ class ALLReader:
                 EMModel,
                 RecordDate,
                 RecordTime,
+                ClockCounter,
+                SerialNumber,
             ) = self.readDatagramHeader()
             self.fileptr.seek(numberOfBytes, 1)
             count += 1
@@ -283,6 +303,8 @@ class ALLReader:
             EMModel,
             RecordDate,
             RecordTime,
+            ClockCounter,
+            SerialNumber,
         ) = self.readDatagramHeader()
         self.recordCounter += 1
 

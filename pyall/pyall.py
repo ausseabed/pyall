@@ -323,6 +323,9 @@ class ALLReader:
         if typeOfDatagram == "f":  # f Raw Range
             dg = f_RAWRANGE(self.fileptr, numberOfBytes)
             return dg.typeOfDatagram, dg
+        if typeOfDatagram == "G":  # G Speed Sound at Head
+            dg = G_SPEEDSOUNDATHEAD(self.fileptr, numberOfBytes)
+            return dg.typeOfDatagram, dg
         if typeOfDatagram == "h":  # h Height, do not confuse with H_Heading!
             dg = h_HEIGHT(self.fileptr, numberOfBytes)
             return dg.typeOfDatagram, dg
@@ -1152,6 +1155,73 @@ class f_RAWRANGE:
         fullDatagram = fullDatagram + footer
 
         return fullDatagram
+
+
+class G_SPEEDSOUNDATHEAD:
+    def __init__(self, fileptr, numberOfBytes):
+        self.typeOfDatagram = "G"
+        self.offset = fileptr.tell()
+        self.numberOfBytes = numberOfBytes
+        self.fileptr = fileptr
+        self.fileptr.seek(numberOfBytes, 1)
+        self.data = ""
+
+    def read(self):
+        self.fileptr.seek(self.offset, 0)
+        rec_fmt = "=LBBHLLHH" + "H"
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack_from
+        bytesRead = rec_len
+        s = rec_unpack(self.fileptr.read(rec_len))
+
+        self.STX = s[1]
+        self.typeOfDatagram = chr(s[2])
+        self.EMModel = s[3]
+        self.RecordDate = s[4]
+        self.Time = float(s[5] / 1000.0)
+        self.Counter = s[6]
+        self.SerialNumber = s[7]
+
+        self.NumberOfEntries = s[8]
+        self.SoundSpeedEntries = []
+
+        # now read the variable part of the sound speed record
+        ss_entry_fmt = "=HH"
+        ss_entry_len = struct.calcsize(ss_entry_fmt)
+        ss_entry_unpack = struct.Struct(ss_entry_fmt).unpack
+
+        for i in range(self.NumberOfEntries):
+            data = self.fileptr.read(ss_entry_len)
+            ss_entry_s = ss_entry_unpack(data)
+            bytesRead += ss_entry_len
+
+            timeInSecondsSinceRecordStart = ss_entry_s[0]
+            # Sound speed in dm/s (incl. offset)
+            soundSpeed = ss_entry_s[1]
+
+            self.SoundSpeedEntries.append([timeInSecondsSinceRecordStart, soundSpeed])
+
+        spare_fmt = "=B"
+        spare_len = struct.calcsize(spare_fmt)
+        spare_unpack = struct.Struct(spare_fmt).unpack
+        spare_data = self.fileptr.read(spare_len)
+        spare_values = spare_unpack(spare_data)
+        assert spare_values[0] == 0  # as stated on kongsberg doc
+
+        # now read the footer
+        self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
+
+    def __repr__(self):
+        entriesstr = ""
+        for entry in self.SoundSpeedEntries:
+            entriesstr += "  {}, {}\n".format(*entry)
+        return (
+            "STX {} \n"
+            "typeOfDatagram {} \n"
+            "NumberOfEntries {} \n"
+            "Sound speed entries: \n{} \n"
+            .format(self.STX, self.typeOfDatagram, self.NumberOfEntries, entriesstr)
+        )
 
 
 class h_HEIGHT:

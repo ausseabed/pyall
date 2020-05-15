@@ -363,6 +363,9 @@ class ALLReader:
         if typeOfDatagram == "k":  # k_WaterColumn
             dg = k_WATERCOLUMN(self.fileptr, numberOfBytes)
             return dg.typeOfDatagram, dg
+        if typeOfDatagram == "S":  # S_Seabed Image
+            dg = S_SEABEDIMAGE(self.fileptr, numberOfBytes)
+            return dg.typeOfDatagram, dg
         else:
             dg = UNKNOWN_RECORD(self.fileptr, numberOfBytes, typeOfDatagram)
             return dg.typeOfDatagram, dg
@@ -2508,6 +2511,75 @@ class k_WATERCOLUMN:
 
     def r_max(self):
         return self.SoundSpeed * max(self.RX_DetectedRange) / (self.SampleFrequency * 2)
+    
+class S_SEABEDIMAGE:
+    def __init__(self, fileptr, numberOfBytes):
+        self.typeOfDatagram = "S"
+        self.offset = fileptr.tell()
+        self.numberOfBytes = numberOfBytes
+        self.fileptr = fileptr
+        self.fileptr.seek(numberOfBytes, 1)
+        self.data = ""
+        self.ARC = {}
+        self.BeamPointingAngle = []
+
+    def read(self):
+        self.fileptr.seek(self.offset, 0)
+        rec_fmt = "=L2BH2L7H2bH2B"
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack_from
+        s = rec_unpack(self.fileptr.read(rec_len))
+
+        # self.numberOfBytes= s[0]
+        self.STX = s[1]
+        self.typeOfDatagram = chr(s[2])
+        self.EMModel = s[3]
+        self.RecordDate = s[4]
+        self.Time = float(s[5] / 1000.0)
+        self.Counter = s[6]
+        self.SerialNumber = s[7]
+        self.MeanAbsorption = float(s[8] * 0.01) # [dB/km]
+        self.PulseLength = s[9]
+        self.RangeToNormalIncidence = s[10]
+        self.StartRangeSampleOfTVGRamp = s[11]
+        self.StopRangeSampleOfTVGRamp = s[12]
+        self.NormalIncidence = float(s[13] * 0.1)  # [dB]
+        self.ObliqueBS = float(s[14] * 0.1)  # [dB]
+        self.TxBeamWidth = float(s[15] * 0.1)  # [deg]
+        self.TVGCrossOver = float(s[16] * 0.1)  # [deg]
+        self.NumBeams = s[17]
+        self.beams = []
+        self.numSamples = 0
+        self.samples = []
+
+        rec_fmt = "=bBHH"
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack
+
+        self.numSamples = 0
+        for i in range(self.NumBeams):
+            s = rec_unpack(self.fileptr.read(rec_len))
+            b = cBeam(s, 0)
+            self.numSamples = self.numSamples + b.numberOfSamplesPerBeam
+            self.beams.append(b)
+
+        rec_fmt = "=" + str(self.numSamples) + "b"
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack
+        self.samples = rec_unpack(self.fileptr.read(rec_len))
+
+        # allocate the samples to the correct beams so it is easier to use
+        sampleIDX = 0
+        for b in self.beams:
+            b.samples = self.samples[sampleIDX : sampleIDX + b.numberOfSamplesPerBeam]
+            sampleIDX = sampleIDX + b.numberOfSamplesPerBeam
+
+        # read an empty byte if necessary
+        if (rec_len + self.numberOfBytes + 3) % 2 != 0:
+            self.fileptr.read(1)
+
+        # now read the footer
+        self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
 
 
 # TIME HELPER FUNCTIONS

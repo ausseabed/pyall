@@ -1891,11 +1891,8 @@ class R_RUNTIME:
             self.DepthMode = "VeryDeep"
 
         if str(self.EMModel) in "EM2040, EM2045":
-            self.DepthMode = "200kHz"
-            if isBitSet(self.mode, 0):
-                self.DepthMode = "300kHz"
-            if isBitSet(self.mode, 1):
-                self.DepthMode = "400kHz"
+            parameter = int(bin(self.mode)[4:],2)
+            self.DepthMode = str(180 + parameter * 10) + "kHz"
 
         self.TXPulseForm = "CW"
         if isBitSet(self.mode, 4):

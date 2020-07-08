@@ -1837,9 +1837,9 @@ class R_RUNTIME:
         self.maximumDepth = s[15]
         self.absorptionCoefficient = s[16] / 100
         self.transmitPulseLength = s[17]
-        self.transmitBeamWidth = s[18]
+        self.transmitBeamWidth = s[18]*0.1
         self.transmitPower = s[19]
-        self.receiveBeamWidth = s[20]
+        self.receiveBeamWidth = s[20]*0.1
         self.receiveBandwidth = s[21]
         self.mode2 = s[22]
         self.tvg = s[23]
@@ -1891,8 +1891,8 @@ class R_RUNTIME:
             self.DepthMode = "VeryDeep"
 
         if str(self.EMModel) in "EM2040, EM2045":
-            parameter = int(bin(self.mode)[4:],2)
-            self.DepthMode = str(180 + parameter * 10) + "kHz"
+            parameter = int(format(self.mode, '08b')[3:],2)
+            self.DepthMode = str(180 + (parameter * 10)) + "kHz"
 
         self.TXPulseForm = "CW"
         if isBitSet(self.mode, 4):
